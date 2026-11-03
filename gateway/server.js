@@ -1,24 +1,28 @@
 // gateway/server.js
-const express = require('express');
-const dotenv = require('dotenv');
-//const authProxy = require('./routes/auth');
-const notifiProxy = require('./routes/notifi');
-const stockProxy = require('./routes/stock');
+let config;
+try {
+  config = require('./config/env');
+} catch (err) {
+  process.stderr.write(`${err.message}\n`);
+  process.exit(1);
+}
 
-dotenv.config();
-
-const app = express();
-
-// Middleware pour analyser les requêtes JSON
-app.use(express.json());
-
-// Routes principales pour chaque microservice
-//app.use('/auth', authProxy);
-app.use('/notify', notifiProxy);
-app.use('/update-stock', stockProxy);
+const logger = require('./utils/logger');
+const app = require('./app');
 
 // Lancer le Gateway
-const PORT = process.env.GATEWAY_PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`Gateway opérationnel sur le port ${PORT}`);
+// fix : port lu dans PORT (render) puis GATEWAY_PORT, logs winston
+const server = app.listen(config.port, () => {
+  logger.info(`Gateway opérationnel sur le port ${config.port}`, {
+    notification: config.notifyUrl,
+    stock: config.stockUrl,
+  });
 });
+
+const shutdown = (signal) => {
+  logger.info(`Signal ${signal} reçu, arrêt en cours`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

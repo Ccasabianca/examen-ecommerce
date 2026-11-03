@@ -1,13 +1,12 @@
 // gateway/routes/stock.js
 const express = require('express');
 const proxy = require('express-http-proxy');
-require('dotenv').config();
+const config = require('../config/env');
+const proxyOptions = require('./proxyOptions');
+
 const router = express.Router();
 
-const STOCK_SERVICE_URL = process.env.STOCK_SERVICE_URL;
-
-router.use('/', proxy(STOCK_SERVICE_URL, {
-  proxyReqPathResolver: (req) => req.originalUrl,
-}));
+// fix : url lue dans la config validée, délai et erreur 502 en json si le microservice ne répond pas
+router.use('/', proxy(config.stockUrl, proxyOptions('stock')));
 
 module.exports = router;

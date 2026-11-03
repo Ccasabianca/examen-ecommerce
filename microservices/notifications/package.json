@@ -1,9 +1,11 @@
 {
   "name": "notifications",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +15,13 @@
     "body-parser": "^1.20.3",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "nodemailer": "^6.9.16"
+    "joi": "^18.3.1",
+    "nodemailer": "^6.9.16",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1"
   }
 }

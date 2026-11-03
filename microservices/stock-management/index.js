@@ -1,13 +1,23 @@
-const express = require('express');
-const app = express();
-const PORT = 4003;
+let config;
+try {
+  config = require('./config/env');
+} catch (err) {
+  process.stderr.write(`${err.message}\n`);
+  process.exit(1);
+}
 
-app.use(express.json());
+const logger = require('./utils/logger');
+const app = require('./app');
 
-app.post('/update-stock', (req, res) => {
-    const { productId, quantity } = req.body;
-    console.log(`Mise à jour du stock: Produit ${productId}, Quantité ${quantity}`);
-    res.send(`Stock mis à jour pour le produit de ID : ${productId}`);
-});
+// fix : port lu dans PORT (render), avant 4003 en dur
+const server = app.listen(config.port, () =>
+  logger.info(`Service de gestion des stocks sur le port ${config.port}`)
+);
 
-app.listen(PORT, () => console.log(`Service de gestion des stocks sur le port ${PORT}`));
+const shutdown = (signal) => {
+  logger.info(`Signal ${signal} reçu, arrêt en cours`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
