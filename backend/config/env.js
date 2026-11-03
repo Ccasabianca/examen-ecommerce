@@ -13,7 +13,7 @@ const schema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required().messages({
     'string.min': 'JWT_SECRET doit contenir au moins 32 caractères',
   }),
-  // liste d'origines séparées par des virgules ; create react app tourne sur 3000 en dev
+  // liste d'origines séparées par des virgules ; le front tourne sur 3000 en dev
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),
   // nombre de proxys de confiance devant l'api (0 en local, 1 derrière nginx ou render)
   TRUST_PROXY: Joi.number().integer().min(0).max(5).default(0),
@@ -28,6 +28,10 @@ const schema = Joi.object({
   // un service gratuit render met environ une minute à se réveiller
   GATEWAY_TIMEOUT_MS: Joi.number().integer().min(1000).default(90000),
   ADMIN_NOTIFY_EMAIL: Joi.string().email().allow('').default(''),
+  // cookie de session réservé au https ; false seulement pour docker compose en http local
+  COOKIE_SECURE: Joi.boolean(),
+  // échecs de connexion tolérés par compte et par adresse ip sur 15 minutes
+  RATE_LIMIT_AUTH_MAX: Joi.number().integer().min(1).default(10),
 }).unknown(true);
 
 const { value: env, error } = schema.validate(process.env, { abortEarly: false, convert: true });
@@ -52,4 +56,6 @@ module.exports = Object.freeze({
   internalApiKey: env.INTERNAL_API_KEY,
   gatewayTimeoutMs: env.GATEWAY_TIMEOUT_MS,
   adminNotifyEmail: env.ADMIN_NOTIFY_EMAIL,
+  cookieSecure: env.COOKIE_SECURE ?? env.NODE_ENV === 'production',
+  rateLimitAuthMax: env.RATE_LIMIT_AUTH_MAX,
 });

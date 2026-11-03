@@ -1,6 +1,8 @@
 /** application express, séparée de server.js pour les tests @module app */
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 
 const config = require('./config/env');
@@ -8,12 +10,18 @@ const logger = require('./utils/logger');
 const requestLogger = require('./middlewares/requestLogger');
 const { notFound, errorHandler } = require('./middlewares/errors');
 const gateway = require('./services/gatewayClient');
+const { apiLimiter } = require('./middlewares/rateLimiters');
 const pkg = require('./package.json');
+
+// fix : un objet {"$ne": null} glissé dans un filtre de requête est neutralisé ($eq), en plus de la validation
+mongoose.set('sanitizeFilter', true);
 
 const app = express();
 
 app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
+// fix : en-têtes de sécurité (helmet)
+app.use(helmet());
 
 // fix : cors limité aux origines de CORS_ORIGIN, avant cors() acceptait tout le monde
 app.use(
@@ -31,6 +39,7 @@ app.use(
 );
 
 app.use(express.json({ limit: '20kb' }));
+app.use(cookieParser());
 app.use(requestLogger);
 
 /** sonde de santé, 503 si la base n'est pas joignable */
@@ -66,6 +75,7 @@ app.get('/api/health/deep', async (_req, res) => {
   });
 });
 
+app.use('/api', apiLimiter);
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));

@@ -3,10 +3,20 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true },
+  // fix : nom limité aux lettres, chiffres et . _ - (avant, du html passait et s'affichait chez l'admin)
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30,
+    match: /^[a-zA-Z0-9._-]+$/,
+  },
+  email: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 254 },
   password: { type: String, required: true },
-  role: { type: String, default: 'user' }, // Peut être 'user' ou 'admin'
+  // fix : deux rôles possibles, 'user' par défaut
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
 });
 
 // Middleware pour hasher le mot de passe avant sauvegarde
