@@ -29,3 +29,6 @@ data/db/
 .DS_Store
 # hooks render (scripts/hooks-vers-github.sh)
 hooks.env
+
+# documentation générée par npm run docs (backend)
+backend/docs/

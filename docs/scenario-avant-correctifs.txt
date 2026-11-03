@@ -1,0 +1,53 @@
+### 1. santé de la chaîne
+HTTP 200 {"status":"ok","backend":{"db":"connected","version":"1.1.0"},"gateway":{"status":"ok","services":[{"name":"notification","status":"ok","durationMs":65},{"name":"stock","status":"ok","durationMs":31}]}}
+
+### 2. catalogue
+Ordinateur Portable 1000 € stock 20
+Smartphone 700 € stock 50
+Casque Audio 150 € stock 30
+Tablette 400 € stock 25
+Clavier Mécanique 120 € stock 15
+
+### 3. inscription avec role=admin dans le corps
+HTTP 201 {"message":"Utilisateur créé avec succès."}
+
+### 4. inscription avec des champs vides
+HTTP 500 {"message":"Une erreur est survenue."}
+
+### 5. connexion : compte inconnu puis mauvais mot de passe (messages différents = énumération)
+HTTP 400 {"message":"Utilisateur non trouvé"}
+HTTP 400 {"message":"Mot de passe incorrect"}
+
+### 6. injection NoSQL au login (username objet)
+HTTP 400 {"message":"Mot de passe incorrect"}
+
+### 7. connexion normale
+jeton reçu : 195 caractères
+
+### 8. commande avec un prix modifié par le client (vrai prix 1000, envoyé 0.01)
+HTTP 201 {"message":"Commande créée avec succès","order":{"userId":"6ae9c2b506ff3851b9e644d4","items":[{"productId":"6ae9ad82a001bfcc827f1f67","quantity":2,"price":0.01,"_id":"6ae9c2b606ff3851b9e644dd"}],"total":0.02,"status":"En attente","shippingAddress":{"street":"12 rue des Lilas","city":"Lyon","posta
+stock du produit après la commande : 20
+
+### 9. commande sans adresse ni paiement (formulaire vide)
+HTTP 500 {"message":"Une erreur est survenue lors de la création de la commande."}
+
+### 10. client qui supprime une commande (route DELETE sans isAdmin ; délai 8 s)
+HTTP 000 {"message":"Une erreur est survenue lors de la création de la commande."}
+
+### 11. client sur la liste des commandes (admin), sans jeton, jeton invalide
+HTTP 403 {"message":"Accès interdit"}
+HTTP 401 Unauthorized
+HTTP 403 {"error":true,"message":"Token invalide upd"}
+
+### 12. XSS : nom d'utilisateur avec du html
+HTTP 201 {"message":"Utilisateur créé avec succès."}
+
+### 13. admin : statut inconnu, puis identifiant mal formé
+HTTP 200 {"message":"Statut mis à jour avec succès","order":{"shippingAddress":{"street":"12 rue des Lilas","city":"Lyon","postalCode":"69001","country":"France"},"_id":"6ae9c2b606ff3851b9e644dc","userId":"6ae9c2b506ff3851b9e644d4","items":[{"productId":"6ae9ad82a001bfcc827f1f67","quantity":2,"price":0.01,
+HTTP 500 {"message":"Erreur serveur."}
+
+### 14. route inconnue
+HTTP 404 {"message":"Route GET /api/inexistante introuvable"}
+
+### 16. mails reçus (mailpit)
+examen_3_11@mywatchbuddy.com | Nouvelle Commande Créée
