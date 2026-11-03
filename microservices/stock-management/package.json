@@ -13,7 +13,7 @@
   "description": "",
   "dependencies": {
     "dotenv": "^16.6.1",
-    "express": "^4.21.1",
+    "express": "^4.22.3",
     "joi": "^18.3.1",
     "winston": "^3.19.0"
   },

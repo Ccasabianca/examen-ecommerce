@@ -20,6 +20,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # seul le backend a besoin de mongo pour ses tests
+  backend:
+    name: backend - tests, audit
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mongo:
+        image: public.ecr.aws/docker/library/mongo:8
+        # port hôte choisi par docker : 27017 peut déjà être pris sur le runner
+        ports:
+          - 27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run format:check --if-present
+      - run: npm test
+        env:
+          MONGO_URI_TEST: mongodb://127.0.0.1:${{ job.services.mongo.ports['27017'] }}/backend_test
+      - name: Audit des dépendances de production
+        env:
+          BLOQUANT: ${{ vars.SECURITE_BLOQUANTE }}
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node -e "
+            const a = require('./audit.json');
+            if (a.error) { console.log('service npm audit indisponible :', a.error.summary || a.error.code); process.exit(0); }
+            const v = a.metadata.vulnerabilities;
+            console.log('vulnérabilités :', JSON.stringify(v));
+            if ((v.high || 0) + (v.critical || 0) > 0 && process.env.BLOQUANT === 'oui') process.exit(1);
+          "
+
   services:
     name: ${{ matrix.name }} - tests, audit
     runs-on: ubuntu-24.04
@@ -27,8 +71,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: backend
-            dir: backend
           - name: gateway
             dir: gateway
           - name: notifications
@@ -38,16 +80,6 @@ jobs:
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
-    services:
-      mongo:
-        image: public.ecr.aws/docker/library/mongo:8
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -59,8 +91,6 @@ jobs:
       - run: npm run lint --if-present
       - run: npm run format:check --if-present
       - run: npm test
-        env:
-          MONGO_URI_TEST: mongodb://127.0.0.1:27017/${{ matrix.name }}_test
       # high ou critical bloquant si SECURITE_BLOQUANTE=oui ; une panne du service d'avis npm ne bloque pas
       - name: Audit des dépendances de production
         env:
@@ -110,7 +140,7 @@ jobs:
 
   images:
     name: image ${{ matrix.name }} - build, scan, push
-    needs: [services, frontend]
+    needs: [backend, services, frontend]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     strategy:
