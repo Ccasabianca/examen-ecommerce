@@ -30,7 +30,7 @@ jobs:
     services:
       mongo:
         image: public.ecr.aws/docker/library/mongo:7
-        # mongo 7 : le conteneur mongo 8 ne démarre pas sur les runners github (atlas reste en 8)
+        # mongo 7 : la 8 refuse de démarrer sur les noyaux linux 6.19 et plus (SERVER-121912), atlas reste en 8
         # port hôte choisi par docker : 27017 peut déjà être pris sur le runner
         ports:
           - 27017
@@ -88,7 +88,7 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: ${{ matrix.dir }}/package-lock.json
-      - run: npm ci
+      - run: npm ci --include=dev
       - run: npm run lint --if-present
       - run: npm run format:check --if-present
       - run: npm test

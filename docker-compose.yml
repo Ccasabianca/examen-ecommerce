@@ -8,7 +8,8 @@ name: exam1
 
 services:
   mongo:
-    image: mongo:8
+    # mongo 7 : la 8 refuse de démarrer sur les noyaux linux 6.19 et plus (SERVER-121912), atlas reste en 8
+    image: mongo:7
     restart: unless-stopped
     # accessible depuis le poste seulement (compass), jamais depuis le réseau
     ports:
