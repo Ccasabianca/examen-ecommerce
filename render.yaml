@@ -3,7 +3,7 @@
 # - render gratuit n'accepte que deux domaines personnalisés : ils vont aux fronts, qui relaient /api et
 #   /health vers leur backend (même origine, pas de cors)
 # - render gratuit bloque le smtp sortant (25, 465, 587) : le microservice notifications tourne sur
-#   l'hébergement hostinger (examen311 et preprod.examen311), joint par le gateway en https
+#   l'hébergement hostinger (examen311 et preprodexamen311), joint par le gateway en https
 # - render gratuit ne reçoit pas de trafic réseau privé : gateway et stock sont publics, protégés par la clé
 #   interne générée une fois par environnement (groupe de variables), à recopier dans hostinger
 
@@ -61,7 +61,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NOTIFI_SERVICE_URL
-        value: https://preprod.examen311.mywatchbuddy.com
+        value: https://preprodexamen311.mywatchbuddy.com
       - key: STOCK_SERVICE_URL
         value: https://ccasa-ecom-stock-preprod.onrender.com
       - key: TRUST_PROXY

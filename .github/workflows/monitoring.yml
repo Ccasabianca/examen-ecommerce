@@ -20,7 +20,7 @@ jobs:
     name: front ${{ matrix.env }}
     # tant que les variables d'url ne sont pas posées, pas de sonde (et pas de mail d'échec)
     if: vars.FRONT_URL_PROD != '' || vars.FRONT_URL_PREPROD != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +56,7 @@ jobs:
   chaine:
     name: chaîne complète ${{ matrix.env }}
     if: (vars.FRONT_URL_PROD != '' || vars.FRONT_URL_PREPROD != '') && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

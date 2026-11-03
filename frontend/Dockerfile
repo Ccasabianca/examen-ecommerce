@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
+# images de base tirées du miroir officiel aws (public.ecr.aws) : pas de limite de téléchargement anonyme comme sur docker hub en ci
 
 # étape 1 : build, l'url de l'api est fixée à la build (/api = même origine via nginx)
 # marche pour vite (dist/) comme pour create react app (build/)
-FROM node:24-alpine AS build
+FROM public.ecr.aws/docker/library/node:24-alpine AS build
 WORKDIR /app
 ARG API_URL=/api
 ENV VITE_API_URL=$API_URL \
@@ -13,7 +14,7 @@ COPY . .
 RUN npm run build && mkdir -p /out && cp -r "$( [ -d dist ] && echo dist || echo build )"/. /out/
 
 # étape 2 : nginx sert la spa et relaie /api vers le backend
-FROM nginx:stable-alpine AS runner
+FROM public.ecr.aws/nginx/nginx:stable-alpine AS runner
 # correctifs alpine publiés après l'image de base (trivy bloque sur une faille critique corrigeable)
 RUN apk upgrade --no-cache
 COPY nginx.conf /etc/nginx/conf.d/default.conf

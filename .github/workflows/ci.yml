@@ -22,7 +22,7 @@ concurrency:
 jobs:
   services:
     name: ${{ matrix.name }} - tests, audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -40,7 +40,7 @@ jobs:
         working-directory: ${{ matrix.dir }}
     services:
       mongo:
-        image: mongo:8
+        image: public.ecr.aws/docker/library/mongo:8
         ports:
           - 27017:27017
         options: >-
@@ -77,7 +77,7 @@ jobs:
 
   frontend:
     name: frontend - tests, build, audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -112,7 +112,7 @@ jobs:
     name: image ${{ matrix.name }} - build, scan, push
     needs: [services, frontend]
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -182,7 +182,7 @@ jobs:
     name: déploiement ${{ github.ref_name == 'main' && 'production' || 'préproduction' }}
     needs: images
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || 'preproduction' }}
       url: ${{ github.ref_name == 'main' && vars.FRONT_URL_PROD || vars.FRONT_URL_PREPROD }}
