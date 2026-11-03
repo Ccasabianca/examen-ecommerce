@@ -3,7 +3,7 @@
 
 # étape 1 : build, l'url de l'api est fixée à la build (/api = même origine via nginx)
 # marche pour vite (dist/) comme pour create react app (build/)
-FROM public.ecr.aws/docker/library/node:24-alpine AS build
+FROM public.ecr.aws/docker/library/node:26-alpine AS build
 WORKDIR /app
 ARG API_URL=/api
 ENV VITE_API_URL=$API_URL \
