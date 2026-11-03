@@ -61,6 +61,8 @@ Session code : failles, bugs, contrôle des entrées, dépendances, documentatio
   `localhost:3001` et posaient un statut hors de la liste. L'administration passe par `/api/orders` et
   `/api/products`, protégés par `isAdmin`.
 - axios et debug dans le backend.
+- `microservices/auth-gateway` : vide depuis l'origine (`index.js` de 0 octet), jamais déployé, avec un
+  express 4.21.1 vulnérable (1 critical, 3 high).
 
 ## [1.1.0] - 2026-11-03
 
