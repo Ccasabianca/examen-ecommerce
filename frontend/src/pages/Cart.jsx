@@ -37,7 +37,8 @@ const Cart = () => {
 
   // Naviguer vers la page de commande
   const handleSubmitOrder = () => {
-    navigate('/shippig_payment');
+    // fix : chemin corrigé, avant "shippig_payment"
+    navigate('/shipping_payment');
   };
 
   return (

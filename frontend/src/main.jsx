@@ -3,10 +3,13 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { CartProvider } from './context/CartContext';
+import AuthProvider from './context/AuthProvider';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
+  <AuthProvider>
     <CartProvider>
-    <App />
+      <App />
     </CartProvider>
+  </AuthProvider>
 );

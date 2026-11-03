@@ -1,8 +1,7 @@
-// src/pages/Register.js
+// src/pages/Register.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL } from '../services/config';
+import { register, getErrorMessage } from '../services/api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -22,22 +21,14 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      await axios.post(`${API_BASE_URL}/auth/register`, formData);
+      await register(formData);
       alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
       navigate('/login');
     } catch (err) {
-      //console.error('Erreur lors de l\'inscription', err);
-      if (err.response) {
-        // Erreur renvoyée par le serveur
-        const { message } = err.response.data;
-        alert(message); // Affiche un message à l'utilisateur (vous pouvez remplacer par un toast)
-      } else {
-        // Erreur réseau ou autre
-        console.error("Erreur réseau ou serveur", err);
-        alert("Une erreur est survenue. Veuillez réessayer.");
-      }
-      //setError('Une erreur est survenue lors de la création du compte.');
+      // fix : message du serveur affiché dans le formulaire (champ manquant, nom ou email déjà pris)
+      setError(getErrorMessage(err));
     }
   };
 
@@ -45,7 +36,7 @@ const Register = () => {
     <div className="flex justify-center items-center h-screen">
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md w-80">
         <h2 className="text-2xl font-bold mb-4 text-center">Inscription</h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && <p role="alert" className="text-red-500 mb-4 whitespace-pre-line">{error}</p>}
         <input
           type="text"
           name="username"

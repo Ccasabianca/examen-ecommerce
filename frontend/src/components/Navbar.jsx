@@ -1,20 +1,19 @@
-// src/components/Navbar.js
+// src/components/Navbar.jsx
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import useAuth from '../hooks/useAuth';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { cart } = useCart();
 
-  // Simuler l'état d'authentification avec le localStorage
-  const isAuthenticated = !!localStorage.getItem('token');
-  const username = localStorage.getItem('username'); // Récupère le nom d'utilisateur si connecté
+  // fix : état de connexion lu dans la session (cookie httponly), plus dans localstorage
+  const { user, isAuthenticated, logout } = useAuth();
 
-  const handleLogout = () => {
-    // Supprimer les informations d'authentification
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
+  const handleLogout = async () => {
+    // fix : la déconnexion efface aussi le cookie côté serveur
+    await logout();
     navigate('/login');
   };
 
@@ -23,15 +22,15 @@ const Navbar = () => {
       <div className="flex items-center space-x-4">
         <Link to="/" className="text-xl font-bold">Mon Application</Link>
       </div>
-      
+
       <div className="flex items-center space-x-4">
         {/* Afficher le nom de l'utilisateur s'il est connecté */}
         {isAuthenticated && (
           <span className="font-semibold">
-            Bonjour, {username}
+            Bonjour, {user.username}
           </span>
         )}
-        
+
         {/* Lien vers le Panier avec le nombre d'articles */}
         <Link to="/cart" className="relative">
           <span>Panier</span>
@@ -41,7 +40,10 @@ const Navbar = () => {
             </span>
           )}
         </Link>
-        
+
+        {/* fix : accès au suivi des commandes une fois connecté */}
+        {isAuthenticated && <Link to="/mes-commandes">Mes commandes</Link>}
+
         {/* Lien Connexion / Déconnexion */}
         {!isAuthenticated ? (
           <>

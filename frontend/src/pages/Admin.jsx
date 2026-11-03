@@ -1,16 +1,18 @@
-// src/pages/Admin.js
+// src/pages/Admin.jsx
 import React, { useState, useEffect } from "react";
 import {
   getOrders,
   updateOrderStatus,
-  // validateOrder,
+  deleteOrder,
   getProducts,
   updateProductStock,
 } from "../services/adminApi";
+import { getErrorMessage } from "../services/api";
 
 const Admin = () => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [error, setError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(null);
   const [newStock, setNewStock] = useState({}); // Stock temporaire par produit
@@ -18,11 +20,19 @@ const Admin = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const ordersResponse = await getOrders();
-      setOrders(ordersResponse.data);
-
-      const productsResponse = await getProducts();
-      setProducts(productsResponse.data);
+      // fix : message d'erreur si l'api échoue, avant la page restait blanche
+      try {
+        const [ordersResponse, productsResponse] = await Promise.all([
+          getOrders(),
+          getProducts(),
+        ]);
+        setOrders(ordersResponse.data);
+        setProducts(productsResponse.data);
+      } catch (err) {
+        setError(
+          getErrorMessage(err, "Impossible de charger les données d'administration.")
+        );
+      }
     };
 
     fetchData();
@@ -42,40 +52,56 @@ const Admin = () => {
 
       alert(`Statut de la commande ${orderId} mis à jour en "${newStatus}".`);
     } catch (error) {
-      alert("Erreur lors de la mise à jour du statut de la commande.");
+      alert(
+        getErrorMessage(error, "Erreur lors de la mise à jour du statut de la commande.")
+      );
     }
     setLoadingOrder(null); // Désactive le loader
   };
 
-  // const handleOrderValidation = async (orderId) => {
-  //   await validateOrder(orderId);
-  //   alert(`Commande ${orderId} validée.`);
-  // };
+  // fix : suppression d'une commande depuis l'administration, avec confirmation
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm(`Supprimer la commande ${orderId} ?`)) return;
+
+    try {
+      await deleteOrder(orderId);
+      setOrders((prevOrders) => prevOrders.filter((order) => order._id !== orderId));
+      alert(`Commande ${orderId} supprimée.`);
+    } catch (error) {
+      alert(getErrorMessage(error, "Erreur lors de la suppression de la commande."));
+    }
+  };
 
   const handleStockUpdate = async (productId) => {
     const stockValue = newStock[productId]; // Récupère la valeur saisie pour ce produit
+    const stockNumber = Number(stockValue);
 
-    if (!stockValue || stockValue < 0) {
+    // fix : 0 accepté (rupture de stock), avant !stockValue refusait la valeur 0
+    if (
+      stockValue === undefined ||
+      stockValue === "" ||
+      !Number.isInteger(stockNumber) ||
+      stockNumber < 0
+    ) {
       alert("Veuillez entrer une quantité de stock valide.");
       return;
     }
 
     try {
       setUpdatingStock(productId); // Active le loader
-      await updateProductStock(productId, stockValue);
-      alert(`Stock du produit mis à jour à ${stockValue}.`);
+      await updateProductStock(productId, stockNumber);
+      alert(`Stock du produit mis à jour à ${stockNumber}.`);
 
       // Mise à jour de l'affichage avec le nouveau stock
       const updatedProducts = products.map((product) =>
-        product._id === productId ? { ...product, stock: stockValue } : product
+        product._id === productId ? { ...product, stock: stockNumber } : product
       );
       setProducts(updatedProducts);
 
       // Réinitialisation du champ
       setNewStock({ ...newStock, [productId]: "" });
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du stock :", error);
-      alert("Échec de la mise à jour du stock.");
+      alert(getErrorMessage(error, "Échec de la mise à jour du stock."));
     } finally {
       setUpdatingStock(null); // Désactive le loader
     }
@@ -83,7 +109,8 @@ const Admin = () => {
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold mb-4">Page d'administration</h2>
+      <h2 className="text-2xl font-bold mb-4">Page d&apos;administration</h2>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
       {/* Gestion des Commandes */}
       <div className="mb-6">
         <h3 className="text-xl font-semibold">Gestion des Commandes</h3>
@@ -129,6 +156,13 @@ const Admin = () => {
               >
                 Détails
               </button>
+
+              <button
+                onClick={() => handleDeleteOrder(order._id)}
+                className="bg-red-500 text-white ml-2 px-2 py-1 mt-2 rounded"
+              >
+                Supprimer
+              </button>
             </li>
           ))}
         </ul>
@@ -157,7 +191,7 @@ const Admin = () => {
                     type="number"
                     placeholder="Nouveau stock"
                     min="0"
-                    value={newStock[product._id] || ""}
+                    value={newStock[product._id] ?? ""}
                     className="border p-2 w-20"
                     onChange={(e) =>
                       setNewStock({
@@ -199,7 +233,11 @@ const Admin = () => {
             <h3 className="text-lg font-semibold mt-4">Produits :</h3>
             <ul className="mt-2">
               {selectedOrder.items.map((item, index) => (
-                <li key={index} className="border-b p-2">
+                <li key={item._id || index} className="border-b p-2">
+                  {/* fix : nom du produit enregistré avec la commande, avant seul l'identifiant s'affichait */}
+                  <p>
+                    <strong>Produit :</strong> {item.name || "Produit inconnu"}
+                  </p>
                   <p>
                     <strong>Produit ID :</strong> {item.productId}
                   </p>

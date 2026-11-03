@@ -1,8 +1,8 @@
-// src/pages/Login.js
+// src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_BASE_URL } from "../services/config";
+import useAuth from "../hooks/useAuth";
+import { getErrorMessage } from "../services/api";
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -10,33 +10,18 @@ const Login = () => {
     password: "",
   });
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/auth/login`,
-        credentials
-      );
-      const { token, role, username } = response.data;
-
-      // Stockage du token et rôle dans le localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("username", username);
-      localStorage.setItem("role", role);
+      // fix : le serveur pose un cookie httponly, plus de jeton ni de rôle stockés dans localstorage
+      await login(credentials);
 
       navigate("/"); // Redirige vers la page d'accueil après la connexion
     } catch (error) {
-      // Gestion des erreurs
-      if (error.response) {
-        // Erreur renvoyée par le serveur
-        const { message } = error.response.data;
-        alert(message); // Affiche un message à l'utilisateur (vous pouvez remplacer par un toast)
-      } else {
-        // Erreur réseau ou autre
-        console.error("Erreur réseau ou serveur", error);
-        alert("Une erreur est survenue. Veuillez réessayer.");
-      }
+      // fix : message du serveur (identifiants invalides, trop de tentatives) ou réseau, sans log de l'erreur
+      alert(getErrorMessage(error));
     }
   };
 

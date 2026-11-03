@@ -121,11 +121,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint --if-present
-      - run: npm test -- --watchAll=false
-      # create react app transforme les avertissements eslint en erreurs quand CI=true
+      - run: npm test
       - run: npm run build
-        env:
-          CI: false
       - name: Audit des dépendances de production
         env:
           BLOQUANT: ${{ vars.SECURITE_BLOQUANTE }}

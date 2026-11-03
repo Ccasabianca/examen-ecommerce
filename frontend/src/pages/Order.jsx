@@ -1,20 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { createOrder } from "../services/api";
+import { createOrder, getErrorMessage } from "../services/api";
 
 const Order = () => {
   const navigate = useNavigate();
+  // fix : bouton bloqué pendant l'envoi, le réveil des services gratuits peut prendre une minute
+  const [submitting, setSubmitting] = useState(false);
   //recuperer le context panier
   const { cart, shippingAddress, paymentMethod, shippingMethod, dispatch } =
     useCart(); // Récupérer le contenu du panier à partir du contexte
   // Naviguer vers la page de commande
   const handleShippingPage = () => {
-    navigate("/shippig_payment");
+    navigate("/shipping_payment");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
 
     // Vérifier les champs manquants
     const missingFields = [];
@@ -47,32 +50,28 @@ const Order = () => {
       return;
     }
 
+    setSubmitting(true);
     try {
-      // Créer la commande seulement si toutes les vérifications passent
-      const orderDetails = {
+      // fix : seuls le produit et la quantité partent, le serveur recalcule prix et total depuis la base
+      await createOrder({
         items: cart.map((item) => ({
           productId: item.id,
           quantity: item.quantity,
-          price: item.price,
         })),
-        total: cart.reduce((acc, item) => acc + item.price * item.quantity, 0),
         shippingAddress,
         paymentMethod,
         shippingMethod,
-      };
-
-      const response = await createOrder(orderDetails);
-
-      if (response.error) {
-        alert(`Erreur : ${response.message || "Échec de la commande"}`);
-        return;
-      }
+      });
 
       dispatch({ type: "CLEAR_CART" });
       alert("Commande confirmée avec succès !");
+      // fix : redirection vers le suivi des commandes, avant l'utilisateur restait sur un panier vide
+      navigate("/mes-commandes");
     } catch (error) {
-      console.error("Erreur lors de la commande", error);
-      alert("Une erreur technique est survenue. Veuillez réessayer.");
+      // fix : message du serveur (stock insuffisant, champ invalide, service indisponible), sans log de la commande
+      alert(`Erreur : ${getErrorMessage(error, "Échec de la commande")}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -186,9 +185,10 @@ const Order = () => {
           <div className="flex justify-end mt-4">
             <button
               onClick={handleSubmit}
-              className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+              disabled={submitting}
+              className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
             >
-              Confirmer la commande
+              {submitting ? "Commande en cours..." : "Confirmer la commande"}
             </button>
           </div>
         </div>

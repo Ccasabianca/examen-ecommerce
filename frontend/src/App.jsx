@@ -1,10 +1,11 @@
-// src/App.js
+// src/App.jsx
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ProductList from './pages/ProductList';
 import Cart from './pages/Cart';
 import Order from './pages/Order';
+import MyOrders from './pages/MyOrders';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Admin from './pages/Admin';
@@ -41,7 +42,8 @@ const router = createBrowserRouter([
         element: <Register />,
       },
       {
-        path: 'shippig_payment',
+        // fix : chemin corrigé, avant "shippig_payment"
+        path: 'shipping_payment',
         element: <ShippingPayment />,
       },
       {
@@ -51,6 +53,11 @@ const router = createBrowserRouter([
       {
         path: 'order',
         element: <ProtectedRoute><Order /></ProtectedRoute>,
+      },
+      {
+        // fix : suivi des commandes côté client, la page n'existait pas
+        path: 'mes-commandes',
+        element: <ProtectedRoute><MyOrders /></ProtectedRoute>,
       },
       {
         path: 'admin',

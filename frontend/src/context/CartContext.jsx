@@ -1,25 +1,29 @@
 import React, { createContext, useContext, useReducer } from "react";
 
-const CartContext = createContext();
+export const CartContext = createContext();
 
 export const cartReducer = (state, action) => {
   switch (action.type) {
-    case "ADD_TO_CART":
-      const existingProductIndex = state.cart.findIndex(
-        (item) => item.id === action.payload.id
-      );
+    case "ADD_TO_CART": {
+      const exists = state.cart.some((item) => item.id === action.payload.id);
 
-      if (existingProductIndex >= 0) {
-        const updatedCart = [...state.cart];
-        updatedCart[existingProductIndex].quantity +=
-          action.payload.quantity || 1;
-        return { ...state, cart: updatedCart };
-      } else {
+      // fix : nouvel objet pour l'article modifié, avant la quantité était changée en place dans l'état
+      if (exists) {
         return {
           ...state,
-          cart: [...state.cart, { ...action.payload, quantity: 1 }],
+          cart: state.cart.map((item) =>
+            item.id === action.payload.id
+              ? { ...item, quantity: item.quantity + (action.payload.quantity || 1) }
+              : item
+          ),
         };
       }
+
+      return {
+        ...state,
+        cart: [...state.cart, { ...action.payload, quantity: 1 }],
+      };
+    }
 
     case "DECREMENT_QUANTITY":
       return {
@@ -52,26 +56,29 @@ export const cartReducer = (state, action) => {
   }
 };
 
+// fix : livraison et paiement valent l'option affichée par défaut, avant null tant qu'on ne changeait pas de choix
+export const initialCartState = {
+  cart: [],
+  shippingMethod: "colissimo",
+  paymentMethod: "Carte bancaire",
+  shippingAddress: {
+    street: "",
+    city: "",
+    postalCode: "",
+    country: "",
+  },
+};
+
 export const CartProvider = ({ children }) => {
 
-  const [cartState, dispatch] = useReducer(cartReducer, {
-    cart: [],
-    shippingMethod: null,
-    paymentMethod: null,
-    shippingAddress: {
-      street: "",
-      city: "",
-      postalCode: "",
-      country: "",
-    },
-  });
+  const [cartState, dispatch] = useReducer(cartReducer, initialCartState);
 
   return (
     <CartContext.Provider value={{ ...cartState, dispatch }}>
       {children}
     </CartContext.Provider>
   );
-  
+
 };
 
 export const useCart = () => useContext(CartContext);
