@@ -86,14 +86,16 @@ services:
         value: "1"
       - key: LOG_LEVEL
         value: info
+      # même base et même utilisateur que le backend de l'environnement, valeur posée dans l'interface
+      - key: MONGO_URI
+        sync: false
 
   - type: web
     name: ccasa-ecom-front-preprod
     runtime: static
     branch: develop
     rootDir: frontend
-    # create react app : CI=false sinon les avertissements eslint font échouer la build
-    buildCommand: npm ci && CI=false npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: build
     autoDeployTrigger: "off"
     domains:
@@ -190,13 +192,16 @@ services:
         value: "1"
       - key: LOG_LEVEL
         value: info
+      # même base et même utilisateur que le backend de l'environnement, valeur posée dans l'interface
+      - key: MONGO_URI
+        sync: false
 
   - type: web
     name: ccasa-ecom-front-prod
     runtime: static
     branch: main
     rootDir: frontend
-    buildCommand: npm ci && CI=false npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: build
     autoDeployTrigger: "off"
     domains:

@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 
+const STATUSES = ['En attente', 'En cours de traitement', 'Expédiée', 'Délivrée', 'Annulée'];
+const PAYMENT_METHODS = ['Carte bancaire', 'PayPal', 'Virement'];
+const SHIPPING_METHODS = ['colissimo', 'chronopost'];
+
 // Define the schema for individual order items
 const orderItemSchema = new mongoose.Schema({
   productId: {
@@ -7,14 +11,18 @@ const orderItemSchema = new mongoose.Schema({
     ref: 'Product',
     required: true,
   },
+  // nom au moment de la commande, pour l'historique du client et les mails
+  name: { type: String },
   quantity: {
     type: Number,
     required: true,
     min: [1, 'Au moins 1 produit est requis'],
   },
+  // fix : prix unitaire lu en base au moment de la commande, plus celui envoyé par le client
   price: {
     type: Number,
     required: true,
+    min: 0,
   },
 });
 
@@ -30,10 +38,11 @@ const orderSchema = new mongoose.Schema(
     total: {
       type: Number,
       required: true,
+      min: 0,
     },
     status: {
       type: String,
-      enum: ['En attente', 'En cours de traitement', 'Expédiée', 'Délivrée', 'Annulée'],
+      enum: STATUSES,
       default: 'En attente',
     },
     shippingAddress: {
@@ -44,13 +53,18 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['Carte bancaire', 'PayPal', 'Virement'],
+      enum: PAYMENT_METHODS,
       required: true,
     },
     shippingMethod: {
       type: String,
-      enum: ['colissimo', 'chronopost'],
+      enum: SHIPPING_METHODS,
       required: true,
+    },
+    // vrai tant que le stock réservé par le microservice stock n'a pas été rendu
+    stockReserved: {
+      type: Boolean,
+      default: false,
     },
     createdAt: {
       type: Date,
@@ -70,3 +84,6 @@ const orderSchema = new mongoose.Schema(
 const Order = mongoose.model('Order', orderSchema);
 
 module.exports = Order;
+module.exports.STATUSES = STATUSES;
+module.exports.PAYMENT_METHODS = PAYMENT_METHODS;
+module.exports.SHIPPING_METHODS = SHIPPING_METHODS;

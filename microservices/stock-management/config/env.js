@@ -7,6 +7,11 @@ const schema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   // render impose PORT ; 4003 reste le port local d'origine
   PORT: Joi.number().port().default(4003),
+  // fix : le stock est lu et modifié en base (avant, le service répondait sans rien faire)
+  MONGO_URI: Joi.string()
+    .pattern(/^mongodb(\+srv)?:\/\//)
+    .required()
+    .messages({ 'string.pattern.base': 'MONGO_URI doit commencer par mongodb:// ou mongodb+srv://' }),
   INTERNAL_API_KEY: Joi.string().min(32).required().messages({
     'string.min': 'INTERNAL_API_KEY doit contenir au moins 32 caractères',
   }),
@@ -25,6 +30,7 @@ module.exports = Object.freeze({
   isProd: env.NODE_ENV === 'production',
   isTest: env.NODE_ENV === 'test',
   port: env.PORT,
+  mongoUri: env.MONGO_URI,
   internalApiKey: env.INTERNAL_API_KEY,
   trustProxy: env.TRUST_PROXY,
   logLevel: env.LOG_LEVEL,

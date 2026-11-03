@@ -35,8 +35,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4003
+      # même base que le backend : le microservice décrémente le stock des produits
+      MONGO_URI: mongodb://mongo:27017/exam1Db
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
       LOG_LEVEL: info
+    depends_on:
+      mongo:
+        condition: service_healthy
 
   notifications:
     build: ./microservices/notifications
@@ -85,6 +90,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
       CORS_ORIGIN: http://localhost:${FRONT_PORT:-3000}
       TRUST_PROXY: 1
+      # http en local : le cookie de session ne peut pas être réservé au https
+      COOKIE_SECURE: "false"
       GATEWAY_URL: http://gateway:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
       ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-examen_3_11@mywatchbuddy.com}

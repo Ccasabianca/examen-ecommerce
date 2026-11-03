@@ -53,6 +53,8 @@ app.use(express.json({ limit: '20kb' }));
 //app.use('/auth', authProxy);
 app.use('/notify', notifiProxy);
 app.use('/update-stock', stockProxy);
+// fix : le backend rend le stock d'une commande annulée, supprimée ou non enregistrée
+app.use('/restore-stock', stockProxy);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route ${req.method} ${req.originalUrl} introuvable` });

@@ -53,4 +53,18 @@ function deepHealth() {
   return call('GET', '/health/deep', null, 150000);
 }
 
-module.exports = { call, notify, deepHealth };
+/**
+ * réserve le stock de chaque ligne, tout ou rien, par le microservice stock
+ * @param {Array<Object>} items lignes { productId, quantity }
+ * @throws {Error} 409 si un produit manque, 503 si le service est injoignable
+ */
+function reserveStock(items) {
+  return call('POST', '/update-stock', { items });
+}
+
+/** rend le stock d'une commande non enregistrée, annulée ou supprimée */
+function restoreStock(items) {
+  return call('POST', '/restore-stock', { items });
+}
+
+module.exports = { call, notify, deepHealth, reserveStock, restoreStock };
