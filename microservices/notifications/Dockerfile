@@ -3,13 +3,13 @@
 # image node générique, identique pour backend, gateway et microservices : seuls ENTRY et PORT changent
 
 # étape 1 : dépendances de prod seulement
-FROM public.ecr.aws/docker/library/node:24-alpine AS deps
+FROM public.ecr.aws/docker/library/node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # étape 2 : image minimale sous l'utilisateur node, sonde de santé pour l'orchestrateur
-FROM public.ecr.aws/docker/library/node:24-alpine AS runner
+FROM public.ecr.aws/docker/library/node:26-alpine AS runner
 ARG ENTRY=index.js
 # sha du commit, renvoyé par /health : le pipeline vérifie que la bonne version tourne
 ARG APP_COMMIT=dev
