@@ -1,0 +1,38 @@
+# une pull request par mise à jour, vérifiée par le pipeline avant fusion
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /backend
+      - /gateway
+      - /microservices/notifications
+      - /microservices/stock-management
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # mongoose 9 retire next() des hooks pre('save') et casse le hachage du mot de passe (models/User.js)
+      - dependency-name: mongoose
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /gateway
+      - /microservices/notifications
+      - /microservices/stock-management
+      - /frontend
+    schedule:
+      interval: weekly
+    ignore:
+      # on reste sur node 24 lts
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

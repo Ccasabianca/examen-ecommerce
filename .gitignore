@@ -27,3 +27,5 @@ data/db/
 
 # Autre
 .DS_Store
+# hooks render (scripts/hooks-vers-github.sh)
+hooks.env

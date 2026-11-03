@@ -1,0 +1,237 @@
+# sur push et pull request : tests et audit de chaque service, tests et build du front
+# sur push seulement : 5 images construites, scannées par trivy et publiées sur ghcr, puis déploiement render
+# de l'environnement de la branche (develop = préproduction, main = production) et test de fumée
+# variable du dépôt SECURITE_BLOQUANTE=oui : l'audit npm (high, critical) et trivy (critical corrigeable)
+# bloquent ; sans elle ils rapportent seulement (dépendances d'origine pas encore mises à jour)
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  services:
+    name: ${{ matrix.name }} - tests, audit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dir: backend
+          - name: gateway
+            dir: gateway
+          - name: notifications
+            dir: microservices/notifications
+          - name: stock
+            dir: microservices/stock-management
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run format:check --if-present
+      - run: npm test
+        env:
+          MONGO_URI_TEST: mongodb://127.0.0.1:27017/${{ matrix.name }}_test
+      # high ou critical bloquant si SECURITE_BLOQUANTE=oui ; une panne du service d'avis npm ne bloque pas
+      - name: Audit des dépendances de production
+        env:
+          BLOQUANT: ${{ vars.SECURITE_BLOQUANTE }}
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node -e "
+            const a = require('./audit.json');
+            if (a.error) { console.log('service npm audit indisponible :', a.error.summary || a.error.code); process.exit(0); }
+            const v = a.metadata.vulnerabilities;
+            console.log('vulnérabilités :', JSON.stringify(v));
+            if ((v.high || 0) + (v.critical || 0) > 0 && process.env.BLOQUANT === 'oui') process.exit(1);
+          "
+
+  frontend:
+    name: frontend - tests, build, audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test -- --watchAll=false
+      # create react app transforme les avertissements eslint en erreurs quand CI=true
+      - run: npm run build
+        env:
+          CI: false
+      - name: Audit des dépendances de production
+        env:
+          BLOQUANT: ${{ vars.SECURITE_BLOQUANTE }}
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node -e "
+            const a = require('./audit.json');
+            if (a.error) { console.log('service npm audit indisponible :', a.error.summary || a.error.code); process.exit(0); }
+            const v = a.metadata.vulnerabilities;
+            console.log('vulnérabilités :', JSON.stringify(v));
+            if ((v.high || 0) + (v.critical || 0) > 0 && process.env.BLOQUANT === 'oui') process.exit(1);
+          "
+
+  images:
+    name: image ${{ matrix.name }} - build, scan, push
+    needs: [services, frontend]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+          - name: gateway
+            context: ./gateway
+          - name: notifications
+            context: ./microservices/notifications
+          - name: stock
+            context: ./microservices/stock-management
+          - name: frontend
+            context: ./frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # tags : nom de branche (lu par render.yaml) et sha complet (demandé par le job de déploiement)
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.name }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=long
+      - name: Construire l'image (locale, pour analyse)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          build-args: APP_COMMIT=${{ github.sha }}
+          load: true
+          tags: scan-image:${{ matrix.name }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Analyse de vulnérabilités (rapport HIGH et CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: scan-image:${{ matrix.name }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "0"
+      - name: Analyse de vulnérabilités (blocage sur CRITICAL corrigeable si SECURITE_BLOQUANTE=oui)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: scan-image:${{ matrix.name }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: ${{ vars.SECURITE_BLOQUANTE == 'oui' && '1' || '0' }}
+      - name: Publier sur GHCR
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          build-args: APP_COMMIT=${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+
+  deploy:
+    name: déploiement ${{ github.ref_name == 'main' && 'production' || 'préproduction' }}
+    needs: images
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'preproduction' }}
+      url: ${{ github.ref_name == 'main' && vars.FRONT_URL_PROD || vars.FRONT_URL_PREPROD }}
+    env:
+      HOOK_BACKEND: ${{ github.ref_name == 'main' && secrets.RENDER_DEPLOY_HOOK_BACKEND_PROD || secrets.RENDER_DEPLOY_HOOK_BACKEND_PREPROD }}
+      HOOK_GATEWAY: ${{ github.ref_name == 'main' && secrets.RENDER_DEPLOY_HOOK_GATEWAY_PROD || secrets.RENDER_DEPLOY_HOOK_GATEWAY_PREPROD }}
+      HOOK_NOTIFICATIONS: ${{ github.ref_name == 'main' && secrets.RENDER_DEPLOY_HOOK_NOTIFICATIONS_PROD || secrets.RENDER_DEPLOY_HOOK_NOTIFICATIONS_PREPROD }}
+      HOOK_STOCK: ${{ github.ref_name == 'main' && secrets.RENDER_DEPLOY_HOOK_STOCK_PROD || secrets.RENDER_DEPLOY_HOOK_STOCK_PREPROD }}
+      HOOK_FRONT: ${{ github.ref_name == 'main' && secrets.RENDER_DEPLOY_HOOK_FRONT_PROD || secrets.RENDER_DEPLOY_HOOK_FRONT_PREPROD }}
+      FRONT_URL: ${{ github.ref_name == 'main' && vars.FRONT_URL_PROD || vars.FRONT_URL_PREPROD }}
+    steps:
+      # la notification hébergée chez hostinger n'a pas de hook : hostinger redéploie à chaque push
+      - name: Déployer les services (image exacte du commit)
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          for svc in stock notifications gateway backend; do
+            var="HOOK_${svc^^}"; hook="${!var}"
+            if [ -z "$hook" ]; then echo "$svc : pas de hook, ignoré"; continue; fi
+            image="ghcr.io/${repo}-${svc}:${GITHUB_SHA}"
+            code=$(curl -sS -o /tmp/render.txt -w '%{http_code}' -X POST "${hook}&imgURL=${image}")
+            if [ "$code" -ge 400 ]; then
+              echo "::warning::$svc : image du commit refusée (HTTP $code), déploiement du tag de branche"
+              code=$(curl -sS -o /tmp/render.txt -w '%{http_code}' -X POST "$hook")
+              if [ "$code" -ge 400 ]; then cat /tmp/render.txt; exit 1; fi
+            fi
+            echo "$svc : déploiement déclenché ($image)"
+          done
+          if [ -n "$HOOK_FRONT" ]; then
+            curl -fsS -o /dev/null -X POST "$HOOK_FRONT" && echo "front : déploiement déclenché"
+          fi
+      # 1. le backend répond avec le sha de ce commit (sinon c'est l'ancienne version qui répond encore)
+      - name: Test de fumée, version déployée
+        if: env.FRONT_URL != '' && env.HOOK_BACKEND != ''
+        run: |
+          for i in $(seq 1 40); do
+            body=$(curl -sS -m 150 "$FRONT_URL/api/health" || true)
+            if echo "$body" | grep -q "\"commit\":\"$GITHUB_SHA\""; then echo "backend à jour : $body"; exit 0; fi
+            echo "tentative $i/40 : pas encore sur $GITHUB_SHA"; sleep 15
+          done
+          echo "le backend ne tourne pas sur le commit attendu : $body"; exit 1
+      # 2. la chaîne complète : front, backend, gateway, notifications, stock (services gratuits à réveiller)
+      - name: Test de fumée, chaîne complète
+        if: env.FRONT_URL != ''
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS -m 170 "$FRONT_URL/api/health/deep" | tee /tmp/health.json | grep -q '"status":"ok"'; then
+              echo "chaîne en ligne :"; cat /tmp/health.json; exit 0
+            fi
+            echo "tentative $i/12, nouvel essai dans 10 s"; sleep 10
+          done
+          echo "la chaîne ne répond pas correctement"; cat /tmp/health.json || true
+          exit 1
