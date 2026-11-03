@@ -1,19 +1,14 @@
 // config/db.js
 const mongoose = require('mongoose');
-require('dotenv').config();
+const logger = require('../utils/logger');
 
-const connectDB = async () => {
-    try {
-        console.log(`url de la page dans les var env ${process.env.MONGO_URI}`);
-        await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-        console.log('MongoDB connecté');
-    } catch (err) {
-        console.error(err.message);
-        process.exit(1);
-    }
+const connectDB = async (uri) => {
+  mongoose.connection.on('error', (err) => logger.error(`Erreur MongoDB : ${err.message}`));
+  mongoose.connection.on('disconnected', () => logger.warn('MongoDB déconnecté'));
+
+  // fix : l'uri (avec identifiants) n'est plus écrite dans les logs, options obsolètes retirées
+  const conn = await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
+  logger.info('MongoDB connecté', { host: conn.connection.host, db: conn.connection.name });
 };
 
 module.exports = connectDB;

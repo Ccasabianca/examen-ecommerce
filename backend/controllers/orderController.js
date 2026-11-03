@@ -1,15 +1,16 @@
 // backend/controllers/orderController.js
-const axios = require('axios');
 const Order = require('../models/Order');
+const config = require('../config/env');
+const gateway = require('../services/gatewayClient');
+const logger = require('../utils/logger');
 const orderLog = require('debug')('orderRoutes:console')
 
 
 exports.createOrder = async (req, res) => {
-  //userLog(`user is ${JSON.stringify(req.user)}`)
-  console.log(`user is in createOrder ${JSON.stringify(req.user)}`)
+  //userLog(`user is in createOrder ${JSON.stringify(req.user)}`)
   //const { items, shippingAddress, paymentMethod } = req.body;
   const { items, shippingAddress, paymentMethod, shippingMethod, } = req.body;
-  console.log(`items are ${JSON.stringify(req.body)}`)
+  orderLog(`commande demandée par ${req.user.userId}`)
   //const { items } = req.body;
   let userId = req.user.userId;
   // let shippingAddress = {
@@ -32,7 +33,6 @@ exports.createOrder = async (req, res) => {
   try {
     // Logique pour préparer les détails de la commande
     const orderDetails = items.map(({ productId, quantity, price }) => {
-      console.log(`Produit ID : ${productId}, Quantité : ${quantity}, Price ${price}`);
       return { productId, quantity, price };
     });
 
@@ -54,20 +54,17 @@ exports.createOrder = async (req, res) => {
     // Sauvegarder la commande dans la base de données
     const savedOrder = await newOrder.save();
 
-    console.log('Commande sauvegardée :', savedOrder);
+    logger.info('order.created', { orderId: String(savedOrder._id), userId, total: savedOrder.total });
 
     // Appel au micro-service de notification
-    try {
-      await axios.post('http://localhost:8000/notify', {
-        to: 'syaob@yahoo.fr',
-        subject: 'Nouvelle Commande Créée',
-        text: `Une commande a été créée avec succès pour les produits suivants : \n${orderDetails
-          .map((item) => `Produit ID : ${item.productId}, Quantité : ${item.quantity}`)
-          .join('\n')}`,
-      });
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de la notification', error);
-    }
+    // fix : url du gateway et destinataire en variables d'environnement (avant localhost:8000 et une adresse en dur)
+    gateway.notify({
+      to: config.adminNotifyEmail,
+      subject: 'Nouvelle Commande Créée',
+      text: `Une commande a été créée avec succès pour les produits suivants : \n${orderDetails
+        .map((item) => `Produit ID : ${item.productId}, Quantité : ${item.quantity}`)
+        .join('\n')}`,
+    });
 
     // Appel au micro-service de gestion des stocks
     // try {
@@ -86,7 +83,7 @@ exports.createOrder = async (req, res) => {
       order: savedOrder,
     });
   } catch (error) {
-    console.error('Erreur lors de la création de la commande', error);
+    logger.error(`Erreur lors de la création de la commande : ${error.message}`);
     res.status(500).json({
       message: 'Une erreur est survenue lors de la création de la commande.',
     });
@@ -149,7 +146,7 @@ exports.createOrder = async (req, res) => {
 
 exports.deleteOrder = async(req, res)=>{
     const { orderId } = req.body;
-    console.log(`orderId to delete is ${orderId}`)
+    orderLog(`suppression demandée pour la commande ${orderId}`)
 }
 
 exports.getOrders = async(req, res)=>{
@@ -168,7 +165,7 @@ exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
 
-  console.log(`dump console log order id => ${orderId} status = ${status}`);
+  orderLog(`changement de statut de ${orderId} vers ${status}`);
   try {
     // Vérification des données
     if (!status) {
@@ -188,7 +185,7 @@ exports.updateOrderStatus = async (req, res) => {
 
     res.status(200).json({ message: "Statut mis à jour avec succès", order });
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de la commande :", error);
+    logger.error(`Erreur lors de la mise à jour de la commande : ${error.message}`);
     res.status(500).json({ message: "Erreur serveur." });
   }
 };
