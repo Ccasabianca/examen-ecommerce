@@ -48,8 +48,10 @@ Session code : failles, bugs, contrôle des entrées, dépendances, documentatio
 
 - `GET /api/orders/mine` et la page Mes commandes : le client suit le statut de ses commandes.
 - `GET /api/auth/me` et `POST /api/auth/logout`.
+- Lien Administration dans la barre de navigation pour les administrateurs.
 - Route `/restore-stock` dans le gateway.
-- Tests : 12 de commandes et 9 d'authentification dans le backend, 23 dans le microservice stock.
+- Tests : 12 de commandes et 9 d'authentification dans le backend, 23 dans le microservice stock,
+  18 dans le front (Vitest).
 - Documentation JSDoc du backend (`npm run docs`), README, ce changelog, scénario de contrôle
   `docs/scenario.sh` avec ses sorties avant et après correctifs.
 

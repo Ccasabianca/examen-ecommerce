@@ -9,7 +9,7 @@ const Navbar = () => {
   const { cart } = useCart();
 
   // fix : état de connexion lu dans la session (cookie httponly), plus dans localstorage
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
   const handleLogout = async () => {
     // fix : la déconnexion efface aussi le cookie côté serveur
@@ -40,6 +40,9 @@ const Navbar = () => {
             </span>
           )}
         </Link>
+
+        {/* fix : lien vers la page admin pour les administrateurs (avant, il fallait taper /admin) */}
+        {isAdmin && <Link to="/admin">Administration</Link>}
 
         {/* fix : accès au suivi des commandes une fois connecté */}
         {isAuthenticated && <Link to="/mes-commandes">Mes commandes</Link>}

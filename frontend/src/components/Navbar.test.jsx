@@ -40,5 +40,11 @@ describe('barre de navigation', () => {
     expect(screen.getByText('Mes commandes')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Déconnexion' })).toBeInTheDocument();
     expect(screen.queryByText('Connexion')).not.toBeInTheDocument();
+    expect(screen.queryByText('Administration')).not.toBeInTheDocument();
+  });
+
+  test('admin : lien vers la page d\'administration', () => {
+    renderNavbar({ user: { username: 'patron', role: 'admin' }, isAuthenticated: true, isAdmin: true });
+    expect(screen.getByRole('link', { name: 'Administration' })).toHaveAttribute('href', '/admin');
   });
 });
