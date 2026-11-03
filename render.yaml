@@ -1,0 +1,226 @@
+# blueprint render : 2 environnements x (backend, gateway, stock-management en images ghcr + front statique)
+# appliquer via New > Blueprint, puis vérifier chaque service (adresse onrender.com, variables, réécritures)
+# - render gratuit n'accepte que deux domaines personnalisés : ils vont aux fronts, qui relaient /api et
+#   /health vers leur backend (même origine, pas de cors)
+# - render gratuit bloque le smtp sortant (25, 465, 587) : le microservice notifications tourne sur
+#   l'hébergement hostinger (examen311 et preprod.examen311), joint par le gateway en https
+# - render gratuit ne reçoit pas de trafic réseau privé : gateway et stock sont publics, protégés par la clé
+#   interne générée une fois par environnement (groupe de variables), à recopier dans hostinger
+
+envVarGroups:
+  - name: ccasa-ecom-internal-prod
+    envVars:
+      - key: INTERNAL_API_KEY
+        generateValue: true
+  - name: ccasa-ecom-internal-preprod
+    envVars:
+      - key: INTERNAL_API_KEY
+        generateValue: true
+
+services:
+  # ---------------------------------------------------------------- préproduction (branche develop)
+  - type: web
+    name: ccasa-ecom-backend-preprod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-backend:develop
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-preprod
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://preprod.examen.mywatchbuddy.com,https://ccasa-ecom-front-preprod.onrender.com
+      - key: TRUST_PROXY
+        value: "1"
+      - key: GATEWAY_URL
+        value: https://ccasa-ecom-gateway-preprod.onrender.com
+      - key: ADMIN_NOTIFY_EMAIL
+        value: examen_3_11@mywatchbuddy.com
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-gateway-preprod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-gateway:develop
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-preprod
+      - key: NODE_ENV
+        value: production
+      - key: NOTIFI_SERVICE_URL
+        value: https://preprod.examen311.mywatchbuddy.com
+      - key: STOCK_SERVICE_URL
+        value: https://ccasa-ecom-stock-preprod.onrender.com
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-stock-preprod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-stock:develop
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-preprod
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-front-preprod
+    runtime: static
+    branch: develop
+    rootDir: frontend
+    # create react app : CI=false sinon les avertissements eslint font échouer la build
+    buildCommand: npm ci && CI=false npm run build
+    staticPublishPath: build
+    autoDeployTrigger: "off"
+    domains:
+      - preprod.examen.mywatchbuddy.com
+    envVars:
+      - key: REACT_APP_API_URL
+        value: /api
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://ccasa-ecom-backend-preprod.onrender.com/api/*
+      - type: rewrite
+        source: /health
+        destination: https://ccasa-ecom-backend-preprod.onrender.com/health
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+  # ---------------------------------------------------------------- production (branche main)
+  - type: web
+    name: ccasa-ecom-backend-prod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-backend:main
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-prod
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://examen.mywatchbuddy.com,https://ccasa-ecom-front-prod.onrender.com
+      - key: TRUST_PROXY
+        value: "1"
+      - key: GATEWAY_URL
+        value: https://ccasa-ecom-gateway-prod.onrender.com
+      - key: ADMIN_NOTIFY_EMAIL
+        value: examen_3_11@mywatchbuddy.com
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-gateway-prod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-gateway:main
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-prod
+      - key: NODE_ENV
+        value: production
+      - key: NOTIFI_SERVICE_URL
+        value: https://examen311.mywatchbuddy.com
+      - key: STOCK_SERVICE_URL
+        value: https://ccasa-ecom-stock-prod.onrender.com
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-stock-prod
+    runtime: image
+    image:
+      url: ghcr.io/ccasabianca/examen-ecommerce-stock:main
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - fromGroup: ccasa-ecom-internal-prod
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: web
+    name: ccasa-ecom-front-prod
+    runtime: static
+    branch: main
+    rootDir: frontend
+    buildCommand: npm ci && CI=false npm run build
+    staticPublishPath: build
+    autoDeployTrigger: "off"
+    domains:
+      - examen.mywatchbuddy.com
+    envVars:
+      - key: REACT_APP_API_URL
+        value: /api
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://ccasa-ecom-backend-prod.onrender.com/api/*
+      - type: rewrite
+        source: /health
+        destination: https://ccasa-ecom-backend-prod.onrender.com/health
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin

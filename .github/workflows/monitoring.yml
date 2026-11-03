@@ -1,0 +1,81 @@
+# sondes externes des deux environnements, un échec = mail github au propriétaire du dépôt
+# fronts toutes les 10 min (sites statiques : ne consomment pas d'heures render)
+# chaîne complète toutes les 6 h : elle réveille les services gratuits de chaque environnement, sur un budget
+# de 750 h par mois pour tout le workspace ; une sonde toutes les 10 min les garderait éveillés en permanence
+# lancement manuel possible (workflow_dispatch) pour le test d'incident
+# urls dans les variables du dépôt : FRONT_URL_PROD, FRONT_URL_PREPROD, FRONT_KEYWORD
+name: Supervision
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fronts:
+    name: front ${{ matrix.env }}
+    # tant que les variables d'url ne sont pas posées, pas de sonde (et pas de mail d'échec)
+    if: vars.FRONT_URL_PROD != '' || vars.FRONT_URL_PREPROD != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: production
+            url: ${{ vars.FRONT_URL_PROD }}
+          - env: préproduction
+            url: ${{ vars.FRONT_URL_PREPROD }}
+    steps:
+      - name: Disponibilité, contenu et temps de réponse
+        env:
+          URL: ${{ matrix.url }}
+          KEYWORD: ${{ vars.FRONT_KEYWORD || '<title>React App</title>' }}
+        run: |
+          if [ -z "$URL" ]; then echo "url non configurée"; exit 0; fi
+          result=$(curl -sS -m 30 -o /tmp/body -w '%{http_code} %{time_total}' "$URL/" 2>/tmp/err) || true
+          code=${result%% *}; duree=${result##* }
+          echo "code $code en ${duree}s"
+          if [ "$code" != "200" ]; then echo "::error::$URL indisponible : $code $(cat /tmp/err)"; exit 1; fi
+          if ! grep -q -- "$KEYWORD" /tmp/body; then echo "::error::$URL sans le contenu attendu"; exit 1; fi
+          if awk -v d="$duree" 'BEGIN { exit !(d > 2) }'; then echo "::warning::$URL lent : ${duree}s"; fi
+      - name: Certificat TLS (échec sous 14 jours)
+        env:
+          URL: ${{ matrix.url }}
+        run: |
+          if [ -z "$URL" ]; then exit 0; fi
+          host=$(echo "$URL" | sed -E 's#https://([^/]+).*#\1#')
+          fin=$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          jours=$(( ( $(date -d "$fin" +%s) - $(date +%s) ) / 86400 ))
+          echo "certificat de $host valable encore $jours jours"
+          if [ "$jours" -lt 14 ]; then echo "::error::certificat de $host expire dans $jours jours"; exit 1; fi
+
+  chaine:
+    name: chaîne complète ${{ matrix.env }}
+    if: (vars.FRONT_URL_PROD != '' || vars.FRONT_URL_PREPROD != '') && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: production
+            url: ${{ vars.FRONT_URL_PROD }}
+          - env: préproduction
+            url: ${{ vars.FRONT_URL_PREPROD }}
+    steps:
+      - name: Front, backend, gateway, notifications, stock
+        env:
+          URL: ${{ matrix.url }}
+        run: |
+          if [ -z "$URL" ]; then echo "url non configurée"; exit 0; fi
+          # jusqu'à trois essais : réveiller trois services gratuits en chaîne prend plusieurs minutes
+          for essai in 1 2 3; do
+            code=$(curl -sS -m 170 -o /tmp/body -w '%{http_code}' "$URL/api/health/deep" 2>/tmp/err) || true
+            if [ "$code" = "200" ] && grep -q '"status":"ok"' /tmp/body; then cat /tmp/body; exit 0; fi
+            echo "essai $essai : code $code"; sleep 20
+          done
+          echo "::error::chaîne $URL dégradée : $(cat /tmp/body /tmp/err 2>/dev/null | head -c 400)"
+          exit 1
