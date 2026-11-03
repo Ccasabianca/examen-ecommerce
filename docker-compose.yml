@@ -1,32 +1,113 @@
-version: '3'
+# préproduction locale : cp .env.example .env, remplir les secrets, puis docker compose up --build -d
+# boutique : http://localhost:3000 ; mails de test (mailpit) : http://localhost:8025
+# ports publiés réglables (FRONT_PORT, BACKEND_PORT) si npm run start:all tourne déjà
+# seuls le front, le backend (tests curl) et mailpit sont publiés : gateway et microservices restent internes
+# fix : gateway ajouté, ports alignés sur le code (4002, 4003 au lieu de 3001, 3002), version de mongo fixée,
+# un Dockerfile par service, sondes de santé et démarrage dans l'ordre
+name: exam1
+
 services:
-  frontend:
-    build: ./frontend
-    ports:
-      - '3000:3000'
-    depends_on:
-      - backend
-
-  backend:
-    build: ./backend
-    ports:
-      - '5000:5000'
-    environment:
-      - MONGO_URI=mongodb://mongo:27017/mydatabase
-    depends_on:
-      - mongo
-
   mongo:
-    image: mongo
+    image: mongo:8
+    restart: unless-stopped
+    # accessible depuis le poste seulement (compass), jamais depuis le réseau
     ports:
-      - '27018:27017'
+      - '127.0.0.1:27018:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-  notifications:
-    build: ./microservices/notifications
+  mailpit:
+    image: axllent/mailpit:v1.33
+    restart: unless-stopped
     ports:
-      - '3001:3001'
+      - '8025:8025'
 
   stock-management:
     build: ./microservices/stock-management
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      LOG_LEVEL: info
+
+  notifications:
+    build: ./microservices/notifications
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      MAIL_TRANSPORT: smtp
+      # mailpit par défaut ; pour la vraie boîte : SMTP_HOST=smtp.hostinger.com, SMTP_PORT=465, SMTP_PASS
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Boutique <examen_3_11@mywatchbuddy.com>}
+      LOG_LEVEL: info
+    depends_on:
+      - mailpit
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      NOTIFI_SERVICE_URL: http://notifications:4002
+      STOCK_SERVICE_URL: http://stock-management:4003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      LOG_LEVEL: info
+    depends_on:
+      notifications:
+        condition: service_healthy
+      stock-management:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
     ports:
-      - '3002:3002'
+      - '${BACKEND_PORT:-5000}:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/exam1Db
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      CORS_ORIGIN: http://localhost:${FRONT_PORT:-3000}
+      TRUST_PROXY: 1
+      GATEWAY_URL: http://gateway:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-examen_3_11@mywatchbuddy.com}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      LOG_LEVEL: info
+    depends_on:
+      mongo:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_URL: /api
+    restart: unless-stopped
+    ports:
+      - '${FRONT_PORT:-3000}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
