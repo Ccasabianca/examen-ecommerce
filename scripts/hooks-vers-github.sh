@@ -2,7 +2,7 @@
 # pousse les hooks render et les urls des fronts dans les secrets et variables du dépôt github
 # 1. copier les hooks (Settings > Deploy Hook de chaque service render) dans hooks.env, hors dépôt :
 #      RENDER_DEPLOY_HOOK_BACKEND_PROD=https://api.render.com/deploy/srv-...?key=...
-#      ... (BACKEND, GATEWAY, NOTIFICATION, STOCK, FRONT) x (PROD, PREPROD)
+#      ... (BACKEND, GATEWAY, STOCK, FRONT) x (PROD, PREPROD), la notification tourne chez hostinger
 #      FRONT_URL_PROD=https://examen.mywatchbuddy.com
 #      FRONT_URL_PREPROD=https://preprod.examen.mywatchbuddy.com
 # 2. bash scripts/hooks-vers-github.sh Ccasabianca/nom-du-depot

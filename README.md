@@ -45,11 +45,26 @@ docker compose exec backend node seeder.js
 
 Boutique sur http://localhost:3000, mails sur http://localhost:8025.
 
-Sans Docker : un MongoDB local, un `.env` par service (copier chaque `.env.example`), puis :
+Sans Docker : Node 24 (le front demande au moins 22.12), un MongoDB local, un `.env` par service (copier
+chaque `.env.example`), puis :
 
 ```bash
 npm install && npm run start:all
 ```
+
+## Mise en production
+
+1. Atlas : un cluster, puis une base et un utilisateur limité à `readWrite` sur cette base, par
+   environnement (`ecommerce_prod`, `ecommerce_preprod`). Produits et compte admin, depuis `backend/` :
+   `MONGO_URI=... ADMIN_EMAIL=... ADMIN_PASSWORD=... node seeder.js` (mot de passe de 12 caractères au moins).
+2. Render : New, Blueprint sur ce dépôt, branche main. `render.yaml` crée les 8 services et les deux groupes
+   de variables. Saisir `MONGO_URI` sur le backend et le stock de chaque environnement (même URI pour les deux).
+3. Hostinger : une appli Node.js par environnement depuis ce dépôt (branche main ou develop), répertoire
+   racine `microservices/notifications`, fichier d'entrée `index.js`, variables de son `.env.example`.
+   `INTERNAL_API_KEY` y prend la même valeur que dans le groupe de variables Render de l'environnement.
+4. DNS : CNAME `examen` et `preprod.examen` vers les deux fronts `onrender.com`, puis Custom Domains sur Render.
+5. GitHub : secrets `RENDER_DEPLOY_HOOK_{BACKEND,GATEWAY,STOCK,FRONT}_{PROD,PREPROD}` (Deploy Hook de chaque
+   service), variables `FRONT_URL_PROD`, `FRONT_URL_PREPROD` et `SECURITE_BLOQUANTE=oui`.
 
 ## Variables d'environnement
 

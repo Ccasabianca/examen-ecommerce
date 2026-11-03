@@ -2,7 +2,7 @@
 # sur push seulement : 5 images construites, scannées par trivy et publiées sur ghcr, puis déploiement render
 # de l'environnement de la branche (develop = préproduction, main = production) et test de fumée
 # variable du dépôt SECURITE_BLOQUANTE=oui : l'audit npm (high, critical) et trivy (critical corrigeable)
-# bloquent ; sans elle ils rapportent seulement (dépendances d'origine pas encore mises à jour)
+# bloquent ; sans elle ils rapportent seulement
 name: CI/CD
 
 on:
